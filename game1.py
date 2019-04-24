@@ -1,4 +1,5 @@
 import pygame,itertools,sys,time,random,math,os
+import enemyBOSS,bullet
 from pygame.locals import *
 
 class Point(object):
@@ -20,6 +21,19 @@ class Point(object):
         return "{X:" + "{:.0f}".format(self.__x) + \
             ",Y:" + "{:.0f}".format(self.__y) + "}"
 
+#bosss删除
+def boss_kill():
+    global Boss_time
+    if Boss_time == True:
+        if jiguang1:
+            jiguang1.kill()
+        if jiguang2:
+            jiguang2.kill()
+        for n in bullet2:
+            n.reset((800,800))
+        Boss_time = False
+        xBoss.blood = enemyBOSS.Boss.blood
+
 def paused():
     global Pause
     while Pause:
@@ -34,6 +48,44 @@ def paused():
         print_text(font, 250, 400, "P A S U E")
         pygame.display.update()
         framerate.tick(5)
+
+def Start_bg_replay():
+    Start_music.play_pause()
+    Start_music.play_sound()
+
+
+def audio_init():
+    global st_au,main_au,boom_au,zdhh_au,js_au,warning_au
+    pygame.mixer.init()
+    st_au = pygame.mixer.Sound("music/bg.ogg")
+    boom_au = pygame.mixer.Sound("music/boom.ogg")
+    zdhh_au = pygame.mixer.Sound("music/player_shoot.ogg")
+    js_au = pygame.mixer.Sound("music/gameover.wav")
+    warning_au = pygame.mixer.Sound("music/bosswaring1.wav")
+
+class Music():
+    def __init__(self,sound):
+        self.channel = None
+        self.sound = sound
+    def play_sound(self):
+        self.channel = pygame.mixer.find_channel(True)
+        self.channel.set_volume(0.5)
+        self.channel.play(self.sound)
+    def play_pause(self):
+        self.channel.set_volume(0.0)
+        self.channel.play(self.sound)
+
+class Music1():
+    def __init__(self,sound):
+        self.channel = None
+        self.sound = sound
+    def play_sound(self):
+        self.channel = pygame.mixer.find_channel(True)
+        self.channel.set_volume(1.0)
+        self.channel.play(self.sound)
+    def play_pause(self):
+        self.channel.set_volume(0.0)
+        self.channel.play(self.sound)
 
 '''class MySprite(pygame.sprite.Sprite):
     def __init__(self, target):
@@ -235,8 +287,10 @@ class Bullet(pygame.sprite.Sprite):
         self.zdlx = zdlx
         self.zdscwz_x, self.zdscwz_y = zidan_pos
         self.player_x = player.X
+        self.zdhh_music = Music(zdhh_au)
     # 移动方法
     def update(self):
+        global Boss_time
         # 修改子弹坐标
         if self.zdlx == 'drfeiji':
             if self.zdscwz_x<self.player_x:
@@ -258,14 +312,22 @@ class Bullet(pygame.sprite.Sprite):
                 player.life-=10
                 drfeiji.drzd_group.remove(wjbjz)
 
+        if Boss_time == True:
+            boss_player_zdpz = pygame.sprite.spritecollideany(xBoss,playerzidan.bullets)
+            if boss_player_zdpz:
+                for n in playerzidan.bullets:
+                    if pygame.sprite.collide_mask(xBoss,n):
+                        xBoss.blood-=20
+                        n.kill()
+
     def __del__(self):
         if self.zydx == 'drfeiji':
-            player_zdhh = NewBoom()
-            player_zdhh.load("chap04/player_zdhh.png", 40, 40, 4)
-            player_zdhh.position = self.rect.left, self.rect.top
-            if self.rect.top > -10:
+            if self.rect.top >= -10:
+                player_zdhh = NewBoom()
+                player_zdhh.load("chap04/player_zdhh.png", 40, 40, 4)
+                player_zdhh.position = self.rect.left, self.rect.top
                 player_zdhh_group.add(player_zdhh)
-
+                self.zdhh_music.play_sound()
 
 # 敌机类，继承自Sprite类
 class dr_feiji(pygame.sprite.Sprite):
@@ -275,8 +337,8 @@ class dr_feiji(pygame.sprite.Sprite):
         # 设置属性
         if drlx =='jy':
             self.image = pygame.image.load("chap04/jydr-01.png").subsurface(pygame.Rect(0, 0, 202, 130))  # image属性：飞机图片
-            self.dr_life = 2000
-        elif drlx == 'pt':
+            self.dr_life = 4000
+        if drlx == 'pt':
             self.image = pygame.image.load("chap04/dr-01.png").subsurface(pygame.Rect(0, 0, 70, 70))  # image属性：飞机图片
         self.rect = self.image.get_rect()  # rect属性：矩形
         self.rect.topleft = dr_pos  # 矩形左上角坐标
@@ -289,6 +351,7 @@ class dr_feiji(pygame.sprite.Sprite):
     # 移动方法
     def update(self):
         # 修改敌人坐标
+        global player_score
         if self.drlx == 'pt':
             if self.drms_sj == 1:
                 self.rect.top += self.speed_y
@@ -333,15 +396,29 @@ class dr_feiji(pygame.sprite.Sprite):
                         n.kill()
                         m.kill()
 
-        jydrpzzd = pygame.sprite.groupcollide(drfeiji.jydr_group,playerzidan.bullets,False,False) #敌人碰到子弹
+        jydrpzzd = pygame.sprite.groupcollide(jydrfeiji.jydr_group,playerzidan.bullets,False,False) #敌人碰到子弹
         if jydrpzzd:
-            for n in drfeiji.jydr_group:
+            for n in jydrfeiji.jydr_group:
                 for m in playerzidan.bullets:
                     if pygame.sprite.collide_mask(n,m):
                         m.kill()
                         n.dr_life-=100
-                        if n.dr_life <= 0 :
-                            n.kill()
+
+
+        if self.drlx=='jy':
+            if self.dr_life<=0:
+                jydrboom.position = self.rect.left, self.rect.top
+                jydr_boom_group.add(jydrboom)
+                dr_cxwq = random.randint(0, 100)  # 敌人被击破时出现武器的几率
+                if dr_cxwq < 20:
+                    playerwq = player_wq((self.rect.left, self.rect.top))
+                    player_wq_group.add(playerwq)
+                if self.rect.top < 800:
+                    player_score += 300
+                self.dr_boom_music = Music1(boom_au)
+                self.dr_boom_music.play_sound()
+                self.kill()
+
 
 
         wjboom = pygame.sprite.spritecollideany(player,drfeiji.dr_group)
@@ -363,6 +440,7 @@ class dr_feiji(pygame.sprite.Sprite):
 
     def __del__(self):
         global player_score
+
         if self.drlx == 'pt':
             boom_x = self.rect.left
             boom_y = self.rect.top
@@ -376,19 +454,8 @@ class dr_feiji(pygame.sprite.Sprite):
             if dr_cxwq<10:
                 playerwq = player_wq((self.rect.left,self.rect.top))
                 player_wq_group.add(playerwq)
-        elif self.drlx == 'jy':
-            boom_x = self.rect.left
-            boom_y = self.rect.top
-            jydrboom = NewBoom()
-            jydrboom.load("chap04/jydr-01_boom.png", 210, 130, 6)
-            jydrboom.position = boom_x, boom_y
-            jydr_boom_group.add(jydrboom)
-            dr_cxwq = random.randint(0, 100)  # 敌人被击破时出现武器的几率
-            if dr_cxwq<20:
-                playerwq = player_wq((self.rect.left,self.rect.top))
-                player_wq_group.add(playerwq)
-            if self.rect.top < 800:
-                player_score += 300
+            self.dr_boom_music = Music1(boom_au)
+            self.dr_boom_music.play_sound()
 #玩家炸弹类
 class player_zhadan(pygame.sprite.Sprite):
     def __init__(self,player_x,player_y):
@@ -572,12 +639,13 @@ class player_wq(pygame.sprite.Sprite):
         self.rect.topleft = drboom_pos
     def update(self):
         global player_wq_level
+        global player_threewq_time
         if self.time > 1000:
             player_wq_group.remove(self)
         self.rect.top+=self.player_wq_speed_y
         self.rect.left+=self.player_wq_speed_x
 
-        if self.rect.top<0:
+        if self.rect.top<-50:
             self.player_wq_speed_y = -self.player_wq_speed_y
         elif self.rect.top>748:
             self.player_wq_speed_y = -self.player_wq_speed_y
@@ -592,8 +660,9 @@ class player_wq(pygame.sprite.Sprite):
             for n in player_wq_group:
                 if pygame.sprite.collide_mask(n,player):
                     player_wq_group.remove(n)
-                    if player_wq_level<4:
+                    if player_wq_level<3:
                         player_wq_level+=1
+                    player_threewq_time=100
 
 
 def print_text(font, x, y, text, color=(255,255,255)):
@@ -607,15 +676,48 @@ def print_chtext(font, x, y, text, color=(255,255,255)):
     screen = pygame.display.get_surface()
     screen.blit(imgText, (x,y))
 
+def print_bosstext(font, x, y, text, color=(255,0,0)):
+    font = pygame.font.Font("C:/Windows/Fonts/simhei.ttf",30)
+    imgText = font.render(text, True, color)
+    screen = pygame.display.get_surface()
+    screen.blit(imgText, (x,y))
 pygame.init()
+audio_init()
 os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (50,50)
 screen = pygame.display.set_mode((600, 800))
 pygame.display.set_caption("飞机大战")
 font = pygame.font.Font(None, 36)
 framerate = pygame.time.Clock()
 
+#BOSS载入
+ruler = wigth,height =600,800
+red = (255,0,0)
+black = (0,0,0)
+kind = True
+
+#boss出现时的警告
+boss_cx_music = Music1(warning_au)
+boss_cx_music_time = 0
+boss_cx_music_flag = False
+
 #游戏开始界面图片
 Start_image = pygame.image.load("chap04/Gameblackgroud.png").convert_alpha()
+#开始界面声音
+Start_music = Music(st_au)
+Start_music.play_sound()
+
+#游戏时的背景音乐
+main_bg_music = pygame.mixer.music
+main_bg_music.load("music/Rockman3.ogg")
+main_bg_music.set_volume(0.8)
+main_bg_music_time = 0
+main_bg_music_cs = True
+
+#游戏结束时的背景音乐
+gameover_music = Music1(js_au)
+gameover_music_time = 0
+gameover_js = 0
+
 
 #精灵组
 player_group = pygame.sprite.Group()
@@ -636,6 +738,7 @@ player.life = 100
 player_group.add(player)
 vel = 5.0
 Kw=Ks=Ka=Kd=0
+player_boom_music = Music(boom_au)
 #玩家武器精灵
 
 #初始化地图
@@ -652,11 +755,13 @@ playerboom = NewBoom()
 playerboom.load("chap04/player_boom.png", 100, 100, 6)
 playerboomjs = False
 #玩家炸弹爆炸
+player_zhadan_ico = pygame.image.load("chap04/player_zhadan_ico.png").convert_alpha()
 zhadanboom = NewBoom()
 zhadanboom.load("chap04/zhadan_boom/player_zhadan_boom.png", 400, 400, 7)
+player_zhadan_num = 5
 #敌人精灵
 drfeiji = MySprite(screen)
-jydr = dr_feiji((random.randint(0,398),-130),'jy')
+jydrfeiji = MySprite(screen)
 #子弹精灵
 playerzidan = MySprite(screen)
 #子弹间隔
@@ -665,6 +770,8 @@ zidanjg = 0
 boomtime = 0
 #敌人间隔
 drjg=0
+#敌人出现间隔
+drupdate_time = 100
 #敌人子弹间隔
 drzdjg=0
 #字体显示间隔
@@ -681,13 +788,33 @@ old_zhadanboom_frame = zhadanboom.frame
 player_score = 0
 #玩家武器等级
 player_wq_level = 1
+#3级武器持续时间
+player_threewq_time = 100
+#玩家和敌人的攻击持续碰撞间隔：
+player_jydr_cxpz_time = 0
+player_boss_cxpz_time = 0
+player_boss_jgcxpz_time1 = 0
+player_boss_jgcxpz_time2 = 0
+boss_zhadan_cxpz_time = 0
 
+boss_bg_music_time = 0
+boss_bg_music_cs = True
+boss_bg_music_playone = False
 
-
+player_win = False
 GameOver = False
 GameStart =False
 Pause = False
+bg_replay_flag = True
+main_bg_replay_flag = True
+boss_bg_replay_flag = True
+Boss_time = False
+boss_cz = False
+change = False
+xBoss_kill = False
 
+
+delay = 100
 while True:
     if GameStart ==True:
         if GameOver == False:
@@ -704,7 +831,8 @@ while True:
                     pygame.quit()
                     exit()
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_j and zhadancz == False:
+                    if event.key == pygame.K_j and zhadancz == False and player_zhadan_num > 0:
+                        bzjydr = None
                         playerzhadan = player_zhadan(player.X, player.Y)
                         zhadan_weiqi = Weiqi()
                         zhadan_weiqi.load("chap04/zhadan/player_zhadan_weiqi.png", 15, 30, 2)
@@ -712,6 +840,7 @@ while True:
                         player_zhadan_group.add(playerzhadan)
                         zhadancz = True
                         zhadantime = 1
+                        player_zhadan_num -= 1
             keys = pygame.key.get_pressed()
             if keys[pygame.K_ESCAPE]:
                 sys.exit()
@@ -820,56 +949,48 @@ while True:
                     zidan_pos = player.X + 30, player.Y - 30
                     arrow = Bullet(zidan_pos,'player','drfeiji')
                     playerzidan.shoot(arrow)
-                if player_wq_level >= 2 and player_wq_level<4:
+                if player_wq_level >= 2 and player_wq_level<3:
                     arrow = Bullet((player.X+20,player.Y-30),'player','drfeiji')
                     arrow1 = Bullet((player.X+40,player.Y-30),'player','drfeiji')
                     playerzidan.shoot(arrow)
                     playerzidan.shoot(arrow1)
-                if player_wq_level == 4:
+                if player_wq_level == 3:
                     arrow = Bullet((player.X-10,player.Y-15),'player','drfeiji')
                     arrow1 = Bullet((player.X+30,player.Y-30),'player','drfeiji')
                     arrow2 = Bullet((player.X+70, player.Y - 15), 'player', 'drfeiji')
                     playerzidan.shoot(arrow)
                     playerzidan.shoot(arrow1)
                     playerzidan.shoot(arrow2)
+                    player_threewq_time -= 1
+                if player_threewq_time == 0:
+                    player_wq_level = 2
+                    player_threewq_time = 100
                 # 子弹移动
             playerzidan.bullets.update()  # 精灵组update时，会调用所有精灵的update方法
 
-
-            if drjg % 100 ==0:
-                drfeiji.drupdate()
-                #生成敌机
-            if drjg % 500 == 0 and player_score > 500:
-                drfeiji.jydrupdate()
-            if zhadantime % 180 ==0:
+            if zhadantime % 180 == 0:
                 zhadancz = False
 
 
+            if Boss_time == False:
+                if drjg % drupdate_time ==0:
+                    drfeiji.drupdate()
+                    #生成敌机
+                if drjg % (drupdate_time*5) == 0 and player_score > 500:
+                    jydrfeiji.jydrupdate()
 
-            drfeiji.dr_group.update()
-            drfeiji.drzd_group.update()
-            drfeiji.jydr_group.update()
+            #玩家碰到敌人
+            #1.精英
+            if pygame.sprite.spritecollideany(player,jydrfeiji.jydr_group):
+                for n in jydrfeiji.jydr_group:
+                    if pygame.sprite.collide_mask(player,n):
+                        if player_jydr_cxpz_time % 60 == 0:
+                            player.life-=10
+                        player_jydr_cxpz_time += 1
+            else:
+                player_jydr_cxpz_time=0
 
-            jydr_boom_group.update('dr',ticks,80)
-            drboom_group.update('dr',ticks, 80)
-            player_zdhh_group.update('zidan',ticks,80)
-            player_zhadan_group.update()
-            zhadan_weiqi_group.update(ticks,60)
-            player_zhadan_boom_group.update('playerzhadan',ticks,60)
-            player_wq_group.update()
 
-            player_wq_group.draw(screen)
-            player_zhadan_group.draw(screen)
-            zhadan_weiqi_group.draw(screen)
-            player_zhadan_boom_group.draw(screen)
-            player_group.draw(screen)
-            playerzidan.bullets.draw(screen)
-            drfeiji.dr_group.draw(screen)
-            drfeiji.jydr_group.draw(screen)
-            drfeiji.drzd_group.draw(screen)
-            drboom_group.draw(screen)
-            jydr_boom_group.draw(screen)
-            player_zdhh_group.draw(screen)
 
 
             #重置炸弹爆炸次数
@@ -878,9 +999,11 @@ while True:
                 zhadanboom.last_frame=6
                 zhadanboomcs -=1
             elif zhadanboomcs==0:
-                player_zhadan_boom_group.remove(zhadanboom)
+                zhadanboom.kill()
                 zhadanboomcs=zhadanboomcs_old
-                bzdr = bzdrzd = None
+                bzdr = bzdrzd = bzjydr = bzbosspz =  None
+                boss_zhadan_cxpz_time = 0
+
 
             if zhadanboom.frame!=old_zhadanboom_frame:
                 bzdr = pygame.sprite.spritecollideany(zhadanboom, drfeiji.dr_group)
@@ -891,10 +1014,391 @@ while True:
                 if bzdrzd:
                     if pygame.sprite.collide_circle_ratio(0.9)(zhadanboom, bzdrzd):
                         drfeiji.drzd_group.remove(bzdrzd)
+                bzjydr = pygame.sprite.spritecollideany(zhadanboom, jydrfeiji.jydr_group)
+                if bzjydr:
+                    for n in jydrfeiji.jydr_group:
+                        if pygame.sprite.collide_mask(zhadanboom,n):
+                            n.dr_life-=2100
+                if Boss_time == True:
+                    bzbosspz = pygame.sprite.collide_mask(zhadanboom, xBoss)
+                    if bzbosspz:
+                        if boss_zhadan_cxpz_time % 180 == 0:
+                            xBoss.blood -= 1000
+                        boss_zhadan_cxpz_time+=1
+
+            drfeiji.dr_group.update()
+            drfeiji.drzd_group.update()
+
+
+            drboom_group.update('dr',ticks, 80)
+            player_zhadan_group.update()
+            player_zhadan_boom_group.update('playerzhadan',ticks,60)
+            jydrfeiji.jydr_group.update()
+            jydr_boom_group.update('dr', ticks, 80)
+            player_zdhh_group.update('zidan',ticks,80)
+            zhadan_weiqi_group.update(ticks,60)
+            player_wq_group.update()
+
+            player_wq_group.draw(screen)
+            player_zhadan_group.draw(screen)
+            zhadan_weiqi_group.draw(screen)
+            player_zhadan_boom_group.draw(screen)
+            player_group.draw(screen)
+            playerzidan.bullets.draw(screen)
+            drfeiji.dr_group.draw(screen)
+            jydrfeiji.jydr_group.draw(screen)
+            drfeiji.drzd_group.draw(screen)
+            drboom_group.draw(screen)
+            player_zdhh_group.draw(screen)
+            jydr_boom_group.draw(screen)
+
+            if player_wq_level == 3:
+                print_chtext(font, 0, 700, "三级武器剩余时间：" + str(player_threewq_time // 10) + "s")
+
+            if player_score > 10000 and Boss_time == False :
+                if boss_cx_music_time % 220 == 0:
+                    boss_cx_music.play_sound()
+                boss_cx_music_time += 1
+                if boss_cx_music_time % 480 == 0:
+                    boss_cx_music.play_pause()
+                    Boss_time = True
+                if boss_cx_music_time % 120 < 60 :
+                    print_bosstext(font,175,150,"警告！BOSS即将出现！")
+
+            if player_score > 2000 and player_score < 4000 and drupdate_time == 100:
+                drupdate_time = 80
+            if player_score > 4000 and player_score < 6000 and drupdate_time == 80:
+                drupdate_time = 60
+            if player_score > 6000 and player_score < 8000 and drupdate_time == 60:
+                drupdate_time = 40
+            if Boss_time == True :
+
+                if boss_cz == False:
+                    main_bg_music.stop()
+                    # boss背景音乐
+                    boss_bg_music = pygame.mixer.music
+                    boss_bg_music.load("music/boss_bg.ogg")
+                    boss_bg_music.set_volume(0.8)
+                    # 生成boss
+                    xBoss = enemyBOSS.Boss(ruler)
+                    weizhi3 = xBoss.rect.center
+                    # 生成子弹
+                    # boss一型子弹
+                    bullet2 = []
+                    bullet2_index = 0
+                    BULLET2_NUM = 100
+                    for en in range(BULLET2_NUM):
+                        bullet2.append(bullet.Bullet2(xBoss.rect.midbottom))
+
+                    # 生成boss散弹
+                    sandan1 = []
+                    sandan1_index = 0
+                    sandan1_NUM = 4
+                    for en in range(sandan1_NUM):
+                        sandan1.append(bullet.Bullet4(weizhi3))
+                    sandan2 = []
+                    sandan2_index = 0
+                    sandan2_NUM = 4
+                    for en in range(sandan2_NUM):
+                        sandan2.append(bullet.Bullet4(weizhi3))
+                    sandan3 = []
+                    sandan3_index = 0
+                    sandan3_NUM = 4
+                    for en in range(sandan3_NUM):
+                        sandan3.append(bullet.Bullet4(weizhi3))
+                    sandan4 = []
+                    sandan4_index = 0
+                    sandan4_NUM = 4
+                    for en in range(sandan4_NUM):
+                        sandan4.append(bullet.Bullet4(weizhi3))
+                    sandan5 = []
+                    sandan5_index = 0
+                    sandan5_NUM = 4
+                    for en in range(sandan5_NUM):
+                        sandan5.append(bullet.Bullet4(weizhi3))
+                    sandan6 = []
+                    sandan6_index = 0
+                    sandan6_NUM = 4
+                    for en in range(sandan6_NUM):
+                        sandan6.append(bullet.Bullet4(weizhi3))
+                    sandan7 = []
+                    sandan7_index = 0
+                    sandan7_NUM = 4
+                    for en in range(sandan7_NUM):
+                        sandan7.append(bullet.Bullet4(weizhi3))
+                    sandan8 = []
+                    sandan8_index = 0
+                    sandan8_NUM = 4
+                    for en in range(sandan8_NUM):
+                        sandan8.append(bullet.Bullet4(weizhi3))
+
+                    # 激光炮
+                    weizhi1 = xBoss.rect.left + 180, xBoss.rect.top + 160
+                    jiguang1 = bullet.Bullet3(weizhi1)
+                    weizhi2 = xBoss.rect.left - 20, xBoss.rect.top + 160
+                    jiguang2 = bullet.Bullet3(weizhi2)
+                    boss_cz=True
+                    boss_bg_music.play()
+
+
+                # boss绘制
+
+                if zidanjg % 60 == 0:
+                    boss_bg_music_time += 1
+                    if boss_bg_music_time % 83 == 0:
+                        boss_bg_music_cs = True
+                if boss_bg_music_time % 83 == 0 and boss_bg_replay_flag and boss_bg_music_cs:
+                    boss_bg_music.play()
+                    boss_bg_music_cs = False
+                # 发射子弹
+                if not (delay % 10):
+                    bullet2[bullet2_index].reset(xBoss.rect.midbottom)
+                    bullet2_index = (bullet2_index + 1) % BULLET2_NUM
+
+
+                if delay % 900 == 0:
+                    kind = not kind
+
+                if xBoss.blood > 2000:
+                    for n in bullet2:
+                        bosszdpz = pygame.sprite.spritecollideany(n, player_group)
+                        zdboom_boos_zdpz = pygame.sprite.spritecollideany(n, player_zhadan_boom_group)
+                        if bosszdpz:
+                            if pygame.sprite.collide_circle_ratio(0.5)(n, player):
+                                n.reset((800, 800))
+                                player.life -= 5
+                        if zdboom_boos_zdpz:
+                            if pygame.sprite.collide_mask(n, zdboom_boos_zdpz):
+                                n.reset((800, 800))
+                    if kind == True:
+                        for b in bullet2:
+                            if b.touches:
+                                b.move()
+                                screen.blit(b.image, b.rect)
+                    else:
+                        for b in bullet2:
+                            b.reset(xBoss.rect.midbottom)
+                        weizhi1 = xBoss.rect.left + 180, xBoss.rect.top + 160
+                        jiguang1.move(weizhi1)
+                        if pygame.sprite.collide_mask(jiguang1,player):
+                            if pygame.sprite.collide_circle_ratio(0.5)(jiguang1,player):
+                                if player_boss_jgcxpz_time1 % 60 == 0 :
+                                    player.life-=5
+                                player_boss_jgcxpz_time1 += 1
+                        else:
+                            player_boss_jgcxpz_time1=0
+                        if not (delay % 20):
+                            screen.blit(jiguang1.image1, jiguang1.rect)
+                        else:
+                            screen.blit(jiguang1.image3, jiguang1.rect)
+                        weizhi2 = xBoss.rect.left - 20, xBoss.rect.top + 160
+                        jiguang2.move(weizhi2)
+                        if pygame.sprite.collide_mask(jiguang2,player):
+                            if pygame.sprite.collide_circle_ratio(0.5)(jiguang2,player):
+                                if player_boss_jgcxpz_time2 % 60 == 0 :
+                                    player.life-=5
+                                player_boss_jgcxpz_time2 += 1
+                        else:
+                            player_boss_jgcxpz_time2=0
+                        if not (delay % 20):
+                            screen.blit(jiguang2.image1, jiguang2.rect)
+                        else:
+                            screen.blit(jiguang2.image3, jiguang2.rect)
+                else:
+                    for n in sandan1:
+                        bosszdpz = pygame.sprite.spritecollideany(n, player_group)
+                        zdboom_boos_zdpz = pygame.sprite.spritecollideany(n, player_zhadan_boom_group)
+                        if bosszdpz:
+                            if pygame.sprite.collide_circle_ratio(0.5)(n, player):
+                                n.reset((800, 800))
+                                player.life -= 5
+                                bosszdpz = None
+                        if zdboom_boos_zdpz:
+                            if pygame.sprite.collide_mask(n, zdboom_boos_zdpz):
+                                n.reset((800, 800))
+                                zdboom_boos_zdpz = None
+                    for n in sandan2:
+                        bosszdpz = pygame.sprite.spritecollideany(n, player_group)
+                        zdboom_boos_zdpz = pygame.sprite.spritecollideany(n, player_zhadan_boom_group)
+                        if bosszdpz:
+                            if pygame.sprite.collide_circle_ratio(0.5)(n, player):
+                                n.reset((800, 800))
+                                player.life -= 5
+                                bosszdpz = None
+                        if zdboom_boos_zdpz:
+                            if pygame.sprite.collide_mask(n, zdboom_boos_zdpz):
+                                n.reset((800, 800))
+                                zdboom_boos_zdpz = None
+                    for n in sandan3:
+                        bosszdpz = pygame.sprite.spritecollideany(n, player_group)
+                        zdboom_boos_zdpz = pygame.sprite.spritecollideany(n, player_zhadan_boom_group)
+                        if bosszdpz:
+                            if pygame.sprite.collide_circle_ratio(0.5)(n, player):
+                                n.reset((800, 800))
+                                player.life -= 5
+                                bosszdpz = None
+                        if zdboom_boos_zdpz:
+                            if pygame.sprite.collide_mask(n, zdboom_boos_zdpz):
+                                n.reset((800, 800))
+                                zdboom_boos_zdpz = None
+                    for n in sandan4:
+                        bosszdpz = pygame.sprite.spritecollideany(n, player_group)
+                        zdboom_boos_zdpz = pygame.sprite.spritecollideany(n, player_zhadan_boom_group)
+                        if bosszdpz:
+                            if pygame.sprite.collide_circle_ratio(0.5)(n, player):
+                                n.reset((800, 800))
+                                player.life -= 5
+                                bosszdpz=None
+                        if zdboom_boos_zdpz:
+                            if pygame.sprite.collide_mask(n, zdboom_boos_zdpz):
+                                n.reset((800, 800))
+                                zdboom_boos_zdpz = None
+                    for n in sandan5:
+                        bosszdpz = pygame.sprite.spritecollideany(n, player_group)
+                        zdboom_boos_zdpz = pygame.sprite.spritecollideany(n, player_zhadan_boom_group)
+                        if bosszdpz:
+                            if pygame.sprite.collide_circle_ratio(0.5)(n, player):
+                                n.reset((800, 800))
+                                player.life -= 5
+                                bosszdpz=None
+                        if zdboom_boos_zdpz:
+                            if pygame.sprite.collide_mask(n, zdboom_boos_zdpz):
+                                n.reset((800, 800))
+                                zdboom_boos_zdpz = None
+                    for n in sandan6:
+                        bosszdpz = pygame.sprite.spritecollideany(n, player_group)
+                        zdboom_boos_zdpz = pygame.sprite.spritecollideany(n, player_zhadan_boom_group)
+                        if bosszdpz:
+                            if pygame.sprite.collide_circle_ratio(0.5)(n, player):
+                                n.reset((800, 800))
+                                player.life -= 5
+                                bosszdpz=None
+                        if zdboom_boos_zdpz:
+                            if pygame.sprite.collide_mask(n, zdboom_boos_zdpz):
+                                n.reset((800, 800))
+                                zdboom_boos_zdpz = None
+                    for n in sandan7:
+                        bosszdpz = pygame.sprite.spritecollideany(n, player_group)
+                        zdboom_boos_zdpz = pygame.sprite.spritecollideany(n, player_zhadan_boom_group)
+                        if bosszdpz:
+                            if pygame.sprite.collide_circle_ratio(0.5)(n, player):
+                                n.reset((800, 800))
+                                player.life -= 5
+                                bosszdpz=None
+                        if zdboom_boos_zdpz:
+                            if pygame.sprite.collide_mask(n, zdboom_boos_zdpz):
+                                n.reset((800, 800))
+                                zdboom_boos_zdpz = None
+                    for n in sandan8:
+                        bosszdpz = pygame.sprite.spritecollideany(n, player_group)
+                        zdboom_boos_zdpz = pygame.sprite.spritecollideany(n, player_zhadan_boom_group)
+                        if bosszdpz:
+                            if pygame.sprite.collide_circle_ratio(0.5)(n, player):
+                                n.reset((800, 800))
+                                player.life -= 5
+                                bosszdpz=None
+                        if zdboom_boos_zdpz:
+                            if pygame.sprite.collide_mask(n, zdboom_boos_zdpz):
+                                n.reset((800, 800))
+                                zdboom_boos_zdpz = None
+                    for d in sandan1:
+                        d.move1()
+                        screen.blit(d.image, d.rect)
+                    for d in sandan2:
+                        d.move2()
+                        screen.blit(d.image, d.rect)
+                    for d in sandan3:
+                        d.move3()
+                        screen.blit(d.image, d.rect)
+                    for d in sandan4:
+                        d.move4()
+                        screen.blit(d.image, d.rect)
+                    for d in sandan5:
+                        d.move5()
+                        screen.blit(d.image, d.rect)
+                    for d in sandan6:
+                        d.move6()
+                        screen.blit(d.image, d.rect)
+                    for d in sandan7:
+                        d.move7()
+                        screen.blit(d.image, d.rect)
+                    for d in sandan8:
+                        d.move8()
+                        screen.blit(d.image, d.rect)
+                weizhi3 = xBoss.rect.center
+                if not (delay % 60):
+                    sandan1[sandan1_index].reset(weizhi3)
+                    sandan1_index = (sandan1_index + 1) % sandan1_NUM
+                    sandan2[sandan2_index].reset(weizhi3)
+                    sandan2_index = (sandan2_index + 1) % sandan2_NUM
+                    sandan3[sandan3_index].reset(weizhi3)
+                    sandan3_index = (sandan3_index + 1) % sandan3_NUM
+                    sandan4[sandan4_index].reset(weizhi3)
+                    sandan4_index = (sandan4_index + 1) % sandan4_NUM
+                    sandan5[sandan5_index].reset(weizhi3)
+                    sandan5_index = (sandan5_index + 1) % sandan5_NUM
+                    sandan6[sandan6_index].reset(weizhi3)
+                    sandan6_index = (sandan6_index + 1) % sandan6_NUM
+                    sandan7[sandan7_index].reset(weizhi3)
+                    sandan7_index = (sandan7_index + 1) % sandan7_NUM
+                    sandan8[sandan8_index].reset(weizhi3)
+                    sandan8_index = (sandan8_index + 1) % sandan8_NUM
+
+
+                delay += 1
+                # boss血条
+                pygame.draw.line(screen, black, (0, 0), (600, 0), 20)
+                boss_life = xBoss.blood / enemyBOSS.Boss.blood
+                pygame.draw.line(screen, red, (0, 0), (600 * boss_life, 0), 20)
+
+                if not (delay % 100):
+                    xBoss.speedx = random.randint(-2, 2)
+                    xBoss.speedy = random.randint(-3, 2)
+
+                # 绘制boss
+
+                if boss_life > 0.7:
+                    xBoss.Bmove()
+                    screen.blit(xBoss.image1, xBoss.rect)
+
+                elif boss_life < 0.7 and boss_life > 0.4 or boss_life == 0.4:
+                    xBoss.Bmove()
+                    screen.blit(xBoss.image2, xBoss.rect)
+                    xBoss.mask = pygame.mask.from_surface(xBoss.image3)
+
+                elif boss_life == 0.4 or boss_life < 0.4 and boss_life > 0:
+                    if change == False:
+                        xBoss.rect = xBoss.image3.get_rect()
+                        xBoss.rect.left, xBoss.rect.top = (xBoss.width - xBoss.rect.width) // 2, 10
+                        change = True
+                    xBoss.life = False
+                    xBoss.Bmove1()
+                    screen.blit(xBoss.image3, xBoss.rect)
+                elif boss_life<=0:
+                    player_score+=10000
+                    time.sleep(2)
+                    player_win = True
+                    playerboomjs = True
+
+
+                # 2.Boss
+                if pygame.sprite.collide_mask(player, xBoss):
+                    if player_boss_cxpz_time % 60 == 0:
+                        player.life -= 10
+                    player_boss_cxpz_time+=1
+                else:
+                    player_boss_cxpz_time=0
+
+
+
 
             #玩家血条
-            pygame.draw.rect(screen, (50, 150, 50, 180), Rect(400, 775, player.life * 2, 25))
-            pygame.draw.rect(screen, (100, 200, 100, 180), Rect(400, 775, 200, 25), 2)
+            pygame.draw.rect(screen, (50, 150, 50, 180), Rect(390, 765, player.life * 2, 25))
+            pygame.draw.rect(screen, (100, 200, 100, 180), Rect(390, 765, 200, 25), 2)
+
+            #炸弹数量
+            screen.blit(player_zhadan_ico, (0, 756))
+            print_text(font, 40, 766, ' X  ' + str(player_zhadan_num))
 
             #玩家分数
             print_text(font,0,10,'Score: '+str(player_score))
@@ -904,6 +1408,7 @@ while True:
                 player.kill()
                 if playerboomjs ==False:
                     playerboom_group.add(playerboom)
+                    player_boom_music.play_sound()
                 if playerboom.frame >= playerboom.last_frame:
                     playerboomjs=True
                     time.sleep(2)
@@ -915,17 +1420,53 @@ while True:
                     n.kill()
                 for n in drboom_group:          #初始化敌人爆炸
                     n.kill()
+                for n in jydr_boom_group:
+                    n.kill()
+                for n in jydrfeiji.jydr_group:
+                    n.kill()
+                for n in player_zdhh_group:
+                    n.kill()
+                for n in player_zhadan_boom_group:
+                    n.kill()
+                for n in player_zhadan_group:
+                    n.kill()#
+                for n in player_wq_group:
+                    n.kill()
+                boss_kill()
+                main_bg_music.stop()
+                gameover_music.play_sound()
+                gameover_music_time+=1
+                boss_cz = False
 
             playerboom_group.update('player', ticks, 100)
             playerboom_group.draw(screen)
 
+            if Boss_time == False:
+                #主要背景音乐循环
+                if zidanjg % 60 ==0:
+                    main_bg_music_time += 1
+                    if main_bg_music_time % 149 == 0:
+                        main_bg_music_cs = True
+                if main_bg_music_time % 149 == 0 and main_bg_replay_flag and main_bg_music_cs and Boss_time == False:
+                    main_bg_music.play()
+                    main_bg_music_cs = False
         else:
+            main_bg_replay_flag = False
+            boss_bg_replay_flag = False
+            gameover_js+=1
             framerate.tick(10)
             screen.fill((0,0,0))
-            print_text(font, 200,400 , "G A M E   O V E R")
+            if player_win == True:
+                print_chtext(font, 245, 400, "恭喜通关！")
+            else:
+                print_text(font, 200, 400, "G A M E   O V E R")
             print_text(font, 207,500,'You Score: '+str(player_score))
             print_chtext(font, 195, 700, "按 “F2” 重 新 开 始")
-
+            if gameover_js%10 == 0:
+                gameover_music_time+=1
+                if gameover_music_time % 12 == 0:
+                    gameover_music.play_pause()
+                    gameover_music.play_sound()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
@@ -939,6 +1480,18 @@ while True:
                 playerboomjs=False
                 player_wq_level=1
                 player_score = 0
+                main_bg_music_time = 0
+                boss_bg_music_time = 0
+                main_bg_music = pygame.mixer.music
+                main_bg_music.load("music/Rockman3.ogg")
+                main_bg_music.play()
+                player_zhadan_num = 5
+                player_win = False
+                gameover_music.play_pause()
+                drupdate_time = 100
+                boss_cx_music_time = 0
+                player_threewq_time = 100
+
     else:
         framerate.tick(1)
         screen.blit(Start_image,(0,0))
@@ -952,5 +1505,10 @@ while True:
                 exit()
             keys = pygame.key.get_pressed()
             if keys[K_F1]:
+                bg_replay_flag = False
+                Start_music.play_pause()
                 GameStart = True
+        bg_music_time = time.clock()
+        if int(bg_music_time) % 14 ==0 and bg_replay_flag and int(bg_music_time)!=0:
+            Start_bg_replay()
     pygame.display.update()
